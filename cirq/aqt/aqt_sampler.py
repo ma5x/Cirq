@@ -82,21 +82,37 @@ class AQTSampler(Sampler):
             json formatted string of the sequence
         """
 
+<<<<<<< HEAD
         seq_list: Union[
             List[Tuple[str, float, List[int]]],
             List[Tuple[str, float, float, List[int]]]
         ] = []
+=======
+        seq_list: List[Union[Tuple[str, float, List[int]],
+                             Tuple[str, float, float, List[int]]]] = []
+>>>>>>> ad6b82201e9dfe0d083b7352f5ce72ca749b4668
         circuit = resolve_parameters(circuit, param_resolver)
         for op in circuit.all_operations():
             line_qubit = cast(Tuple[LineQubit], op.qubits)
             op = cast(ops.GateOperation, op)
             qubit_idx = [obj.x for obj in line_qubit]
             op_str = get_op_string(op)
+<<<<<<< HEAD
             gate = cast(ops.EigenGate, op.gate)
             if op_str == 'R':
                 seq_list.append((op_str, float(gate.exponent), float(gate.phase_exponent), qubit_idx))
             else:
                 seq_list.append((op_str, gate.exponent, qubit_idx))
+=======
+            gate: Union[ops.EigenGate, ops.PhasedXPowGate]
+            if op_str == 'R':
+                gate = cast(ops.PhasedXPowGate, op.gate)
+                seq_list.append((op_str, float(gate.exponent),
+                                 float(gate.phase_exponent), qubit_idx))
+            else:
+                gate = cast(ops.EigenGate, op.gate)
+                seq_list.append((op_str, float(gate.exponent), qubit_idx))
+>>>>>>> ad6b82201e9dfe0d083b7352f5ce72ca749b4668
         if len(seq_list) == 0:
             raise RuntimeError('Cannot send an empty circuit')
         json_str = json.dumps(seq_list)
@@ -172,8 +188,9 @@ class AQTSampler(Sampler):
         measurements_int = data['samples']
         measurements = np.zeros((len(measurements_int), num_qubits))
         for i, result_int in enumerate(measurements_int):
+            measurement_int_bin = format(result_int, '0{}b'.format(num_qubits))
             for j in range(num_qubits):
-                measurements[i, j] = np.floor(result_int / 2**j)
+                measurements[i, j] = int(measurement_int_bin[j])
         return measurements
 
     def run_sweep(self,

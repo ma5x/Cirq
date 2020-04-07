@@ -341,6 +341,20 @@ SINGLE_QUBIT_HALF_PI_DESERIALIZERS = [
 #
 # CZ Serializer and deserializer
 #
+
+# Only CZ
+CZ_SERIALIZER = op_serializer.GateOpSerializer(
+    gate_type=ops.CZPowGate,
+    serialized_gate_id='cz',
+    args=[
+        op_serializer.SerializingArg(serialized_name='half_turns',
+                                     serialized_type=float,
+                                     op_getter='exponent')
+    ],
+    can_serialize_predicate=lambda op: _near_mod_2(
+        cast(ops.CZPowGate, op.gate).exponent, 1.0))
+
+# CZ to any power
 CZ_POW_SERIALIZER = op_serializer.GateOpSerializer(
     gate_type=ops.CZPowGate,
     serialized_gate_id='cz',
@@ -424,22 +438,36 @@ SQRT_ISWAP_DESERIALIZERS = [
 # Only allows sqrt_iswap, its inverse, identity, and sycamore
 #
 def _can_serialize_limited_fsim(theta: float, phi: float):
-    # Identity
-    if _near_mod_2pi(theta, 0) and _near_mod_2pi(phi, 0):
-        return True
-    # sqrt ISWAP
-    if _near_mod_2pi(theta, -np.pi / 4) and _near_mod_2pi(phi, 0):
-        return True
-    # inverse sqrt ISWAP
-    if _near_mod_2pi(theta, np.pi / 4) and _near_mod_2pi(phi, 0):
-        return True
+    # Symbols for LIMITED_FSIM are allowed, but may fail server-side
+    # if an incorrect run context is specified
+    if _near_mod_2pi(phi, 0) or isinstance(phi, sympy.Symbol):
+        if isinstance(theta, sympy.Symbol):
+            return True
+        # Identity
+        if _near_mod_2pi(theta, 0):
+            return True
+        # sqrt ISWAP
+        if _near_mod_2pi(theta, -np.pi / 4):
+            return True
+        # inverse sqrt ISWAP
+        if _near_mod_2pi(theta, np.pi / 4):
+            return True
     # Sycamore
-    if _near_mod_2pi(theta, np.pi / 2) and _near_mod_2pi(phi, np.pi / 6):
+    if ((_near_mod_2pi(theta, np.pi / 2) or isinstance(theta, sympy.Symbol)) and
+        (_near_mod_2pi(phi, np.pi / 6)) or isinstance(phi, sympy.Symbol)):
+        return True
+    # CZ
+    if ((_near_mod_2pi(theta, 0) or isinstance(theta, sympy.Symbol)) and
+        (_near_mod_2pi(phi, np.pi)) or isinstance(phi, sympy.Symbol)):
         return True
     return False
 
 
 def _can_serialize_limited_iswap(exponent: float):
+    # Symbols for LIMITED_FSIM are allowed, but may fail server-side
+    # if an incorrect run context is specified
+    if isinstance(exponent, sympy.Symbol):
+        return True
     # Sqrt ISWAP
     if _near_mod_n(exponent, 0.5, 4):
         return True
@@ -483,7 +511,21 @@ LIMITED_FSIM_SERIALIZERS = [
         ],
         can_serialize_predicate=(lambda op: _can_serialize_limited_iswap(
             cast(ops.ISwapPowGate, op.gate).exponent))),
+    op_serializer.GateOpSerializer(
+        gate_type=ops.CZPowGate,
+        serialized_gate_id='fsim',
+        args=[
+            op_serializer.SerializingArg(serialized_name='theta',
+                                         serialized_type=float,
+                                         op_getter=lambda e: 0),
+            op_serializer.SerializingArg(serialized_name='phi',
+                                         serialized_type=float,
+                                         op_getter=lambda e: np.pi)
+        ],
+        can_serialize_predicate=lambda op: _near_mod_2(
+            cast(ops.CZPowGate, op.gate).exponent, 1.0))
 ]
+
 
 LIMITED_FSIM_DESERIALIZER = op_deserializer.GateOpDeserializer(
     serialized_gate_id='fsim',
